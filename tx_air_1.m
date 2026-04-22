@@ -1778,7 +1778,7 @@ function plot_core_performance(sys, sim_log, rt_err, nodes, targets, all_dets_hi
     text_str{end+1} = '';
     text_str{end+1} = '[A] EVALUATION CONTEXT';
     text_str{end+1} = sprintf('    - Evaluation distance (Pd & Localization): %.0f km', R_eval);
-    text_str{end+1} = '    - Target order: Jet1 (high RCS) -> Jet3 (low RCS)';
+    text_str{end+1} = '    - Target order by RCS: Jet1 (high) -> Jet2 (mid) -> Jet3 (low)';
     text_str{end+1} = '';
     text_str{end+1} = '[B] METRIC-BY-METRIC COMPARISON (Theory / Sim / Gap)';
     text_str{end+1} = '  1) Detection Probability P_d (higher is better)';
