@@ -1769,37 +1769,42 @@ function plot_core_performance(sys, sim_log, rt_err, nodes, targets, all_dets_hi
     % 最大探测距离
     R_max_sim(isnan(R_max_sim)) = R_max_th_two(isnan(R_max_sim));
     
-    % 构建文字内容
+    % 构建文字内容（按“背景->指标定义->结果对比->说明”组织）
+    target_labels = {'Jet1 (RCS=25)', 'Jet2 (RCS=5)', 'Jet3 (RCS=0.5)'};
     text_str = {};
     text_str{end+1} = '========================================================';
-    text_str{end+1} = '    FOUR PERFORMANCE BOUNDS: THEORY vs SIMULATION      ';
+    text_str{end+1} = '      FOUR PERFORMANCE BOUNDS: THEORY vs SIMULATION    ';
     text_str{end+1} = '========================================================';
     text_str{end+1} = '';
-    text_str{end+1} = sprintf('Evaluation Distance for Pd & Localization: %.0f km', R_eval);
+    text_str{end+1} = '[A] EVALUATION CONTEXT';
+    text_str{end+1} = sprintf('    - Evaluation distance (Pd & Localization): %.0f km', R_eval);
+    text_str{end+1} = '    - Target order: Jet1 (high RCS) -> Jet3 (low RCS)';
     text_str{end+1} = '';
-    text_str{end+1} = '1) DETECTION PROBABILITY (P_d)';
-    text_str{end+1} = sprintf('   Jet1 (RCS=25):  Theory = %.3f,  Sim = %.3f', Pd_th(1), Pd_sim(1));
-    text_str{end+1} = sprintf('   Jet2 (RCS=5):   Theory = %.3f,  Sim = %.3f', Pd_th(2), Pd_sim(2));
-    text_str{end+1} = sprintf('   Jet3 (RCS=0.5): Theory = %.3f,  Sim = %.3f', Pd_th(3), Pd_sim(3));
+    text_str{end+1} = '[B] METRIC-BY-METRIC COMPARISON (Theory / Sim / Gap)';
+    text_str{end+1} = '  1) Detection Probability P_d (higher is better)';
+    for k = 1:3
+        text_str{end+1} = sprintf('     %s: %.3f / %.3f / %+.3f', ...
+            target_labels{k}, Pd_th(k), Pd_sim(k), Pd_sim(k)-Pd_th(k));
+    end
+    text_str{end+1} = '  2) Localization RMSE (m, lower is better)';
+    for k = 1:3
+        text_str{end+1} = sprintf('     %s: %.1f / %.1f / %+.1f', ...
+            target_labels{k}, sigma_pos_th(k), sigma_pos_sim(k), sigma_pos_sim(k)-sigma_pos_th(k));
+    end
+    text_str{end+1} = '  3) Tracking RMSE (m, lower is better)';
+    for k = 1:3
+        text_str{end+1} = sprintf('     %s: %.1f / %.1f / %+.1f', ...
+            target_labels{k}, sigma_track_th(k), sigma_track_sim(k), sigma_track_sim(k)-sigma_track_th(k));
+    end
+    text_str{end+1} = '  4) Maximum Detection Range (km, higher is better)';
+    for k = 1:3
+        text_str{end+1} = sprintf('     %s: %.1f / %.1f / %+.1f', ...
+            target_labels{k}, R_max_th_two(k), R_max_sim(k), R_max_sim(k)-R_max_th_two(k));
+    end
     text_str{end+1} = '';
-    text_str{end+1} = '2) LOCALIZATION ACCURACY (Position RMSE, m)';
-    text_str{end+1} = sprintf('   Jet1: Theory = %.1f,  Sim = %.1f', sigma_pos_th(1), sigma_pos_sim(1));
-    text_str{end+1} = sprintf('   Jet2: Theory = %.1f,  Sim = %.1f', sigma_pos_th(2), sigma_pos_sim(2));
-    text_str{end+1} = sprintf('   Jet3: Theory = %.1f,  Sim = %.1f', sigma_pos_th(3), sigma_pos_sim(3));
-    text_str{end+1} = '';
-    text_str{end+1} = '3) TRACKING ACCURACY (Steady-state RMSE, m)';
-    text_str{end+1} = sprintf('   Jet1: Theory = %.1f,  Sim = %.1f', sigma_track_th(1), sigma_track_sim(1));
-    text_str{end+1} = sprintf('   Jet2: Theory = %.1f,  Sim = %.1f', sigma_track_th(2), sigma_track_sim(2));
-    text_str{end+1} = sprintf('   Jet3: Theory = %.1f,  Sim = %.1f', sigma_track_th(3), sigma_track_sim(3));
-    text_str{end+1} = '';
-    text_str{end+1} = '4) MAXIMUM DETECTION RANGE (km)';
-    text_str{end+1} = sprintf('   Jet1: Theory = %.1f,  Sim = %.1f', R_max_th_two(1), R_max_sim(1));
-    text_str{end+1} = sprintf('   Jet2: Theory = %.1f,  Sim = %.1f', R_max_th_two(2), R_max_sim(2));
-    text_str{end+1} = sprintf('   Jet3: Theory = %.1f,  Sim = %.1f', R_max_th_two(3), R_max_sim(3));
-    text_str{end+1} = '';
-    text_str{end+1} = '========================================================';
-    text_str{end+1} = '  Note: Theoretical values have been slightly adjusted  ';
-    text_str{end+1} = '  to account for realistic system imperfections.        ';
+    text_str{end+1} = '[C] NOTE';
+    text_str{end+1} = '    - Theoretical values include mild calibration for';
+    text_str{end+1} = '      practical system imperfections.';
     text_str{end+1} = '========================================================';
     
     % 在figure中央显示文本
