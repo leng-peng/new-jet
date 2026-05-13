@@ -88,7 +88,8 @@ end
 
 function stage = task_driven_stage(mission, nodes)
 required_phase_rad = deg2rad(mission.cross_node_phase_target_deg);
-precision_index = clamp(1 - required_phase_rad / deg2rad(mission.max_phase_reference_deg), 0.05, 1.0);
+max_phase_reference_rad = deg2rad(mission.max_phase_reference_deg);
+precision_index = clamp(1 - required_phase_rad / max_phase_reference_rad, 0.05, 1.0);
 switch lower(mission.mode)
     case 'detect_only'
         coordination_mode = 'coherent_priority_detection';
@@ -190,7 +191,8 @@ selected_count = sum(selected);
 combining_factor = clamp(1 - stage4.residual_ratio, 0, 1);
 snr_linear = fusion.snr_reference_linear + ...
     selected_count * (fusion.snr_node_baseline + fusion_efficiency) * combining_factor;
-snr_gain_db = 10 * log10(max(snr_linear, fusion.snr_linear_floor));
+DB_CONVERSION_FACTOR = 10;
+snr_gain_db = DB_CONVERSION_FACTOR * log10(max(snr_linear, fusion.snr_linear_floor));
 
 stage = struct();
 stage.node_weights = effective_weights;
@@ -278,12 +280,14 @@ end
 end
 
 function y = normalize_metric(x, scale)
-y = clamp(abs(x) ./ max(scale, eps), 0, 1);
+MIN_SCALE_VALUE = 1e-12;
+y = clamp(abs(x) ./ max(scale, MIN_SCALE_VALUE), 0, 1);
 end
 
 function w = normalize_weights(x)
 s = sum(x);
-if s <= 1e-10
+WEIGHT_SUM_EPSILON = 1e-10;
+if s <= WEIGHT_SUM_EPSILON
     w = ones(size(x)) / numel(x);
 else
     w = x / s;
