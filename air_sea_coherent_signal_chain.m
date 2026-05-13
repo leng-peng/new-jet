@@ -65,7 +65,8 @@ cfg = set_default(cfg, 'fusion', struct( ...
     'weight_exponent', 1.3, ...
     'fallback_min_quality', 0.35, ...
     'snr_node_baseline', 0.15, ...
-    'snr_reference_linear', 1.0));
+    'snr_reference_linear', 1.0, ...
+    'snr_linear_floor', 1e-3));
 
 cfg = set_default(cfg, 'optimization', struct( ...
     'snr_gain_target_db', 5.5, ...
@@ -88,11 +89,13 @@ end
 function stage = task_driven_stage(mission, nodes)
 required_phase_rad = deg2rad(mission.cross_node_phase_target_deg);
 precision_index = clamp(1 - required_phase_rad / deg2rad(mission.max_phase_reference_deg), 0.05, 1.0);
-coordination_mode = 'hybrid_coherent_cluster';
-if strcmpi(mission.mode, 'detect_only')
-    coordination_mode = 'coherent_priority_detection';
-elseif strcmpi(mission.mode, 'imaging_only')
-    coordination_mode = 'coherent_priority_imaging';
+switch lower(mission.mode)
+    case 'detect_only'
+        coordination_mode = 'coherent_priority_detection';
+    case 'imaging_only'
+        coordination_mode = 'coherent_priority_imaging';
+    otherwise
+        coordination_mode = 'hybrid_coherent_cluster';
 end
 
 stage = struct();
@@ -187,7 +190,7 @@ selected_count = sum(selected);
 combining_factor = clamp(1 - stage4.residual_ratio, 0, 1);
 snr_linear = fusion.snr_reference_linear + ...
     selected_count * (fusion.snr_node_baseline + fusion_efficiency) * combining_factor;
-snr_gain_db = 10 * log10(max(snr_linear, eps));
+snr_gain_db = 10 * log10(max(snr_linear, fusion.snr_linear_floor));
 
 stage = struct();
 stage.node_weights = effective_weights;
@@ -280,7 +283,7 @@ end
 
 function w = normalize_weights(x)
 s = sum(x);
-if s <= eps
+if s <= 1e-10
     w = ones(size(x)) / numel(x);
 else
     w = x / s;
