@@ -145,7 +145,7 @@ base = (link_quality .* credibility) .^ fusion.weight_exponent;
 penalty = (1 - stage4.residual_ratio);
 weights = normalize_weights(base * penalty);
 
-selected = (weights >= fusion.selection_threshold / max(n, 1));
+selected = (weights >= fusion.selection_threshold);
 if ~any(selected)
     [~, idx] = max(weights);
     selected(idx) = true;
@@ -155,7 +155,8 @@ effective_weights = weights .* selected;
 effective_weights = normalize_weights(effective_weights);
 
 fusion_efficiency = clamp(sum(effective_weights .* (link_quality .* credibility)), 0, 1);
-snr_gain_db = 10 * log10(max(1, 1 + n * fusion_efficiency * (1 - stage4.residual_ratio)));
+snr_linear = 1 + n * fusion_efficiency * clamp(1 - stage4.residual_ratio, 0, 1);
+snr_gain_db = 10 * log10(snr_linear);
 
 stage = struct();
 stage.node_weights = effective_weights;
@@ -225,7 +226,7 @@ end
 
 ln = numel(cfg.nodes.link_quality);
 if ln == 0
-    error('cfg.nodes.link_quality can not be empty.');
+    error('cfg.nodes.link_quality cannot be empty.');
 end
 if numel(cfg.nodes.credibility) ~= ln || numel(cfg.errors.time_sync_ns) ~= ln || ...
         numel(cfg.errors.freq_offset_hz) ~= ln || numel(cfg.errors.phase_drift_deg) ~= ln || ...
