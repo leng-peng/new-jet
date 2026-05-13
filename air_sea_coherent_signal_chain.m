@@ -42,7 +42,8 @@ cfg = set_default(cfg, 'errors', struct( ...
     'freq_offset_hz', [1.1 1.5 2.0 2.4], ...
     'phase_drift_deg', [3.5 4.0 5.4 6.1], ...
     'position_m', [2.4 3.0 3.8 4.5], ...
-    'channel_fade_db', [0.6 0.8 1.1 1.3]));
+    'channel_fade_db', [0.6 0.8 1.1 1.3], ...
+    'weights', struct('time',0.24,'freq',0.20,'phase',0.28,'position',0.16,'channel',0.12)));
 
 cfg = set_default(cfg, 'sync', struct( ...
     'time_reference_stability', 0.91, ...
@@ -52,11 +53,15 @@ cfg = set_default(cfg, 'compensation', struct( ...
     'coarse_sync_factor', 0.58, ...
     'fine_sync_factor', 0.73, ...
     'prediction_factor', 0.56, ...
-    'feedback_factor', 0.62));
+    'feedback_factor', 0.62, ...
+    'weights', struct('coarse',0.35,'fine',0.35,'predictive',0.15,'feedback',0.15), ...
+    'residual_floor', 0.02));
 
 cfg = set_default(cfg, 'fusion', struct( ...
     'selection_threshold', 0.62, ...
-    'weight_exponent', 1.3));
+    'weight_exponent', 1.3, ...
+    'fallback_min_quality', 0.35, ...
+    'snr_node_baseline', 0.15));
 
 cfg = set_default(cfg, 'optimization', struct( ...
     'snr_gain_target_db', 5.5, ...
@@ -92,8 +97,9 @@ phase_norm = normalize_metric(errors.phase_drift_deg, 20);
 pos_norm = normalize_metric(errors.position_m, 8);
 channel_norm = normalize_metric(errors.channel_fade_db, 3);
 
-err_vector = (0.24 * time_norm + 0.20 * freq_norm + 0.28 * phase_norm + ...
-    0.16 * pos_norm + 0.12 * channel_norm);
+w = errors.weights;
+err_vector = (w.time * time_norm + w.freq * freq_norm + w.phase * phase_norm + ...
+    w.position * pos_norm + w.channel * channel_norm);
 
 model_confidence = clamp(1 - mean(err_vector) * (1 + 0.2 * (1 - stage1.precision_index)), 0, 1);
 
@@ -125,8 +131,9 @@ fine_gain = clamp(compensation.fine_sync_factor * (0.5 + 0.5 * stage3.sync_quali
 predictive_gain = clamp(compensation.prediction_factor * stage3.unified_spacetime_score, 0, 1);
 feedback_gain = clamp(compensation.feedback_factor * stage3.sync_quality, 0, 1);
 
-residual_ratio = clamp(1 - (0.35 * coarse_gain + 0.35 * fine_gain + ...
-    0.15 * predictive_gain + 0.15 * feedback_gain), 0.02, 1.0);
+cw = compensation.weights;
+residual_ratio = clamp(1 - (cw.coarse * coarse_gain + cw.fine * fine_gain + ...
+    cw.predictive * predictive_gain + cw.feedback * feedback_gain), compensation.residual_floor, 1.0);
 
 stage = struct();
 stage.coarse_gain = coarse_gain;
@@ -146,21 +153,30 @@ penalty = (1 - stage4.residual_ratio);
 weights = normalize_weights(base * penalty);
 
 selected = (weights >= fusion.selection_threshold);
+fallback_triggered = false;
+fallback_quality = 0;
 if ~any(selected)
     [~, idx] = max(weights);
     selected(idx) = true;
+    fallback_triggered = true;
+    fallback_quality = link_quality(idx) * credibility(idx);
 end
 
 effective_weights = weights .* selected;
 effective_weights = normalize_weights(effective_weights);
 
 fusion_efficiency = clamp(sum(effective_weights .* (link_quality .* credibility)), 0, 1);
-snr_linear = 1 + n * fusion_efficiency * clamp(1 - stage4.residual_ratio, 0, 1);
+selected_count = sum(selected);
+combining_factor = clamp(1 - stage4.residual_ratio, 0, 1);
+snr_linear = 1 + selected_count * (fusion.snr_node_baseline + fusion_efficiency) * combining_factor;
 snr_gain_db = 10 * log10(snr_linear);
 
 stage = struct();
 stage.node_weights = effective_weights;
 stage.selected_nodes = selected;
+stage.fallback_triggered = fallback_triggered;
+stage.fallback_quality = fallback_quality;
+stage.fallback_below_min_quality = fallback_triggered && (fallback_quality < fusion.fallback_min_quality);
 stage.fusion_efficiency = fusion_efficiency;
 stage.estimated_snr_gain_db = snr_gain_db;
 end
