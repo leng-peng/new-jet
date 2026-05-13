@@ -83,7 +83,7 @@ cfg = set_default(cfg, 'optimization', struct( ...
     'next_iteration', struct( ...
         'comp_base',0.6,'comp_snr_gain',0.08,'comp_robust_gain',0.05,'comp_min',0.3,'comp_max',0.95, ...
         'fusion_base',0.58,'fusion_sidelobe_gain',0.04,'fusion_min',0.45,'fusion_max',0.80, ...
-        'clock_base',1.0,'clock_snr_gain',0.08,'clock_max',1.5)));
+        'clock_base',1.0,'clock_snr_gain',0.08,'clock_min',1.0,'clock_max',1.5)));
 end
 
 function stage = task_driven_stage(mission, nodes)
@@ -122,7 +122,8 @@ w = errors.weights;
 err_vector = (w.time * time_norm + w.freq * freq_norm + w.phase * phase_norm + ...
     w.position * pos_norm + w.channel * channel_norm);
 
-model_confidence = clamp(1 - mean(err_vector) * (1 + stage1.precision_influence * (1 - stage1.precision_index)), 0, 1);
+precision_adjustment = 1 + stage1.precision_influence * (1 - stage1.precision_index);
+model_confidence = clamp(1 - mean(err_vector) * precision_adjustment, 0, 1);
 
 stage = struct();
 stage.node_count = n;
@@ -191,8 +192,8 @@ selected_count = sum(selected);
 combining_factor = clamp(1 - stage4.residual_ratio, 0, 1);
 snr_linear = fusion.snr_reference_linear + ...
     selected_count * (fusion.snr_node_baseline + fusion_efficiency) * combining_factor;
-DB_CONVERSION_FACTOR = 10;
-snr_gain_db = DB_CONVERSION_FACTOR * log10(max(snr_linear, fusion.snr_linear_floor));
+POWER_TO_DB_MULTIPLIER = 10;
+snr_gain_db = POWER_TO_DB_MULTIPLIER * log10(max(snr_linear, fusion.snr_linear_floor));
 
 stage = struct();
 stage.node_weights = effective_weights;
@@ -233,7 +234,7 @@ stage.next_iteration = struct( ...
     'fusion_threshold', clamp(tune.fusion_base + tune.fusion_sidelobe_gain * sidelobe_gap, ...
     tune.fusion_min, tune.fusion_max), ...
     'clock_tightening_factor', clamp(tune.clock_base + tune.clock_snr_gain * max(0, snr_gap), ...
-    tune.clock_base, tune.clock_max));
+    tune.clock_min, tune.clock_max));
 end
 
 function cfg = set_default(cfg, field_name, value)
